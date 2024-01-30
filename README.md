@@ -17,6 +17,10 @@ nix-autoenv zsh-setup
 nix-autoenv bash-setup
 ```
 
+#### Manual use
+
+You can use nix-autoenv manually as well by creating shell function that sources the output of `nix-autoenv <your-shell-here>`
+
 ### How does it work?
 
 nix-autoenv runs `nix flake info` on every cd, if it fails to run it will restore the environment,
