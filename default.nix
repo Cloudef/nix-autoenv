@@ -22,13 +22,13 @@ let
       ${coreutils}/bin/env -u PWD -u SHLVL -u _ -u TEMP -u TEMPDIR -u TMPDIR -u TMP -0 |\
       while IFS='=' read -d $'\0' -r k v; do
          printf '%s=%s\0' "$k" "$v"
-      done | grep -zv __nix_autoenv_saved_ | grep -zv "'" | ${coreutils}/bin/sort -zu > "$1"
+      done | ${gnugrep}/bin/grep -zv __nix_autoenv_saved_ | ${gnugrep}/bin/grep -zv "'" | ${coreutils}/bin/sort -zu > "$1"
       '';
    envget = writeShellScript "envget" ''
       ${coreutils}/bin/env -u PWD -u SHLVL -u _ -u TEMP -u TEMPDIR -u TMPDIR -u TMP -0 |\
       while IFS='=' read -d $'\0' -r k v; do
          printf '%s=%s\0' "$k" "$v"
-      done | grep -zv "'"
+      done | ${gnugrep}/bin/grep -zv "'"
       '';
 in writeShellApplication {
    name = "nix-autoenv";
