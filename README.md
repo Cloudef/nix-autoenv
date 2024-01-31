@@ -6,7 +6,8 @@ nix-direnv alternative that does not need a .direnv metafile
 > nix-autoenv only works with flake projects.
 
 > [!TODO]
-> darwin support with sandbox-exec
+> - darwin support with sandbox-exec
+> - add tests
 
 ![animation](./animation.svg)
 
