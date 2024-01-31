@@ -131,7 +131,7 @@ in writeShellApplication {
 
       flake_detect() {
          if "$NIX" flake info --json 1>"$tmpdir/info" 2>/dev/null && \
-            "$NIX" flake show --json 2>/dev/null | jq -e --arg system "${targetPlatform.system}" -r '.devShells."\($system)" | keys | .[]' 1>"$tmpdir/devshells"; then
+            "$NIX" flake show --json 2>/dev/null | jq -e --arg system "${targetPlatform.system}" -r '.devShells."\($system)" | keys | .[]' 2>/dev/null 1>"$tmpdir/devshells"; then
             rev=$(jq -r '.url, .lastModified' "$tmpdir/info")
             if [[ "$rev" != "''${__nix_autoenv_flake_rev:-}" ]]; then
                printf '__nix_autoenv_flake_rev=%s\0' "$rev" | $2 0
