@@ -41,7 +41,7 @@ in writeShellApplication {
       trap 'rm -rf "$tmpdir"' EXIT
 
       is_in_flake() {
-         test "''${__nix_autoenv_flake_rev:-}" != ""
+         test "''${__nix_autoenv_flake_url:-}" != ""
       }
 
       unset_sh() {
@@ -118,13 +118,13 @@ in writeShellApplication {
 
       flake_env() {
          if "$NIX" flake info --json 1>"$tmpdir/info" 2>/dev/null; then
-            IFS=$'\n' read -rd "" rev url < <(jq -r '.url, .original.url' "$tmpdir/info") || true
+            url=$(jq -r '.original.url' "$tmpdir/info")
             path="''${url/file:\/\//}"
             if shell_env "$path" "$3"; then
                restore_env "$1" "$2"
                ${envget-sorted} "$tmpdir/orig"
                comm --check-order -z23 "$tmpdir/env" "$tmpdir/orig" | $2
-               printf '__nix_autoenv_flake_rev=%s\0__nix_autoenv_flake_shell=%s\0' "$rev" "$3" | $2 0
+               printf '__nix_autoenv_flake_url=%s\0__nix_autoenv_flake_shell=%s\0' "$url" "$3" | $2 0
             fi
          fi
       }
@@ -132,9 +132,9 @@ in writeShellApplication {
       flake_detect() {
          if "$NIX" flake info --json 1>"$tmpdir/info" 2>/dev/null && \
             "$NIX" flake show --json 2>/dev/null | jq -e --arg system "${targetPlatform.system}" -r '.devShells."\($system)" | keys | .[]' 2>/dev/null 1>"$tmpdir/devshells"; then
-            rev=$(jq -r '.url, .lastModified' "$tmpdir/info")
-            if [[ "$rev" != "''${__nix_autoenv_flake_rev:-}" ]]; then
-               printf '__nix_autoenv_flake_rev=%s\0' "$rev" | $2 0
+            url=$(jq -r '.original.url' "$tmpdir/info")
+            if [[ "$url" != "''${__nix_autoenv_flake_url:-}" ]]; then
+               printf '__nix_autoenv_flake_url=%s\0' "$url" | $2 0
                if [[ ''${NIX_AUTOENV_AUTO:-0} == 1 ]]; then
                   flake_env "$1" "$2" .
                else
