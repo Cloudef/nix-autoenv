@@ -8,6 +8,7 @@ nix-direnv alternative that does not need a .direnv metafile
 > [!TODO]
 > - darwin support with sandbox-exec
 > - add tests
+> - nix-autoenv auto save (to make certain paths automatic)
 
 ![animation](./animation.svg)
 
