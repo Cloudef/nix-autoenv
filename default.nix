@@ -128,7 +128,7 @@ in writeShellApplication {
                comm --check-order -z23 "$tmpdir/env" "$tmpdir/orig" | $2
                printf '__nix_autoenv_flake_url=%s\0__nix_autoenv_flake_shell=%s\0' "$url" "$3" | $2 0
                if git status --porcelain=v2 2>/dev/null | (grep -Po '.*(?=\s+[^\s]+$)' 2>/dev/null || true) > "$tmpdir/git-state"; then
-                  git_state="$(nix hash file "$tmpdir/git-state")"
+                  git_state="$("$NIX" hash file "$tmpdir/git-state")"
                   printf '__nix_autoenv_flake_git_state=%s\0' "$git_state" | $2 0
                fi
             fi
@@ -151,7 +151,7 @@ in writeShellApplication {
                fi
             else
                if git status --porcelain=v2 2>/dev/null | (grep -Po '.*(?=\s+[^\s]+$)' 2>/dev/null || true) > "$tmpdir/git-state"; then
-                  git_state="$(nix hash file "$tmpdir/git-state")"
+                  git_state="$("$NIX" hash file "$tmpdir/git-state")"
                   if [[ "$git_state" != "''${__nix_autoenv_flake_git_state:-}" ]] && [[ "''${__nix_autoenv_flake_shell:-}" ]]; then
                      printf 'nix-autoenv: Changes detected %s != %s ...\n' "$git_state" "''${__nix_autoenv_flake_git_state:-none}" 1>&2
                      flake_env "$1" "$2" "$__nix_autoenv_flake_shell"
