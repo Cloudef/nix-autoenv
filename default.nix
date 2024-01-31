@@ -8,6 +8,7 @@
    , bubblewrap
    , jq
    , git
+   , time
    , nix
    , bundleNix ? false
    , targetPlatform
@@ -24,10 +25,9 @@ let
       version = "0.0.1";
    in writeShellApplication {
       name = "bwrap";
-      runtimeInputs = [ coreutils ];
       text = ''
-         tmpdir="$(mktemp -d)"
-         trap 'rm -rf "$tmpdir"' EXIT
+         tmpdir="$(${coreutils}/bin/mktemp -d)"
+         trap '${coreutils}/bin/rm -rf "$tmpdir"' EXIT
          printf '(version 1)\n' > "$tmpdir/sandbox.scm"
 
          simulate-bind() {
@@ -80,7 +80,7 @@ let
                --unshare-cgroup|--unshare-cgroup-try)
                   ;;
                --setenv)
-                  export "$2"="3"
+                  export "$2"="$3"
                   shift;shift;;
                --unsetenv)
                   unset "$2"
@@ -128,19 +128,17 @@ let
    # These commands do not try to handle env vars that contain single quotes
    # Escaping these portably for every shell is PITA
    envget-sorted = writeShellScript "envget-w-keys" ''
-      PATH="$__nix_autoenv_real_path" \
       ${coreutils}/bin/env -u PWD -u SHLVL -u _ -u TEMP -u TEMPDIR -u TMPDIR -u TMP -0 |\
          ${gnugrep}/bin/grep -zv __nix_autoenv_ | ${gnugrep}/bin/grep -zv "'" | ${coreutils}/bin/sort -zu > "$1"
       '';
    envget = writeShellScript "envget" ''
-      PATH="$__nix_autoenv_real_path" \
       ${coreutils}/bin/env -u PWD -u SHLVL -u _ -u TEMP -u TEMPDIR -u TMPDIR -u TMP \
          -u __nix_autoenv_real_path -u __nix_autoenv_prev_pwd -0 |\
          ${gnugrep}/bin/grep -zv "'"
       '';
 
    # Do not pass to writeShellApplication since we want to preserve real path
-   runtimeInputs = [ coreutils gnugrep gnused jq git ]
+   runtimeInputs = [ time coreutils gnugrep gnused jq git ]
       ++ optionals (bundleNix) [ nix ]
       ++ optionals (targetPlatform.isLinux) [ bubblewrap ]
       ++ optionals (targetPlatform.isDarwin) [ bubblewrap-darwin ];
@@ -211,6 +209,7 @@ in writeShellApplication {
          nix_cache="''${XDG_CONFIG_CACHE:-$HOME/.cache}/nix"
          read -r git_config _ < <(git config --list --show-origin | grep git/config | head -n1 | sed 's/file://')
          time bwrap --unshare-all --share-net --die-with-parent \
+            --setenv PATH "$__nix_autoenv_real_path:${git}/bin" \
             --tmpfs /tmp \
             --bind "$tmpdir" "$tmpdir" \
             --dev-bind /dev/null /dev/null \
