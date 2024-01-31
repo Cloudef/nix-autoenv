@@ -121,10 +121,11 @@ in writeShellApplication {
             IFS=$'\n' read -rd "" rev url < <(jq -r 'if .dirtyRevision != null then .dirtyRevision else .revision end, .original.url' "$tmpdir/info") || true
             test "$rev" != "null" && test "$rev" != ""
             path="''${url/file:\/\//}"
-            if __nix_autoenv_flake_rev="$rev" shell_env "$path" "$3"; then
+            if shell_env "$path" "$3"; then
                restore_env "$1" "$2"
                ${envget-sorted} "$tmpdir/orig"
                comm --check-order -z23 "$tmpdir/env" "$tmpdir/orig" | $2
+               printf '__nix_autoenv_flake_rev=%s\0' "$rev" | $2
             fi
          fi
       }
@@ -145,6 +146,7 @@ in writeShellApplication {
                fi
             fi
          elif is_in_flake; then
+            echo 'nix-autoenv: Restoring environment ...' 1>&2
             restore_env "$1" "$2"
          fi
       }
@@ -171,7 +173,7 @@ in writeShellApplication {
             flake_detect unset_fish export_fish
             ;;
          fish-export)
-            flake_env unset_fish export_fish "''${2:-.}"
+            flake_env unset_fish export_fish ".#''${2-}"
             ;;
          bash-setup)
             printf 'source <(${placeholder "out"}/bin/nix-autoenv bash-source)\n'
@@ -180,7 +182,7 @@ in writeShellApplication {
             cat <<'EOF'
       nix-autoenv() {
          if [[ "$1" == "switch" ]]; then
-            source (${placeholder "out"}/bin/nix-autoenv zsh-export "$2" | psub)
+            source <(${placeholder "out"}/bin/nix-autoenv bash-export "$2")
          else
             ${placeholder "out"}/bin/nix-autoenv "$@"
          fi
@@ -201,7 +203,7 @@ in writeShellApplication {
             cat <<'EOF'
       nix-autoenv() {
          if [[ "$1" == "switch" ]]; then
-            source (${placeholder "out"}/bin/nix-autoenv zsh-export "$2" | psub)
+            source <(${placeholder "out"}/bin/nix-autoenv zsh-export "$2")
          else
             ${placeholder "out"}/bin/nix-autoenv "$@"
          fi
@@ -214,7 +216,7 @@ in writeShellApplication {
             flake_detect unset_sh export_sh
             ;;
          *sh-export)
-            flake_env unset_sh export_sh "''${2:-.}"
+            flake_env unset_sh export_sh ".#''${2:-}"
             ;;
          *)
             printf 'usage: nix-autoenv [bash | fish | zsh | ... ]\n' 1>&2
