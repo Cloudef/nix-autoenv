@@ -5,6 +5,8 @@ nix-direnv alternative that does not need a .direnv metafile
 > [!NOTE]
 > nix-autoenv only works with flake projects.
 
+![animation](./animation.svg)
+
 ### How to setup?
 
 Run the following command and put the output in your shell's rc file:
