@@ -17,7 +17,114 @@ with builtins;
 with lib;
 
 let
-   # Not a writeShellApplication because it mangles PATH
+   # https://reverse.put.as/wp-content/uploads/2011/09/Apple-Sandbox-Guide-v0.1.pdf
+   # https://github.com/NixOS/nix/blob/master/src/libstore/build/sandbox-defaults.sb
+   # Darwin has no concept of binds, so --binds only work if src and dest are the same
+   bubblewrap-darwin = let
+      version = "0.0.1";
+   in writeShellApplication {
+      name = "bwrap";
+      runtimeInputs = [ coreutils ];
+      text = ''
+         tmpdir="$(mktemp -d)"
+         trap 'rm -rf "$tmpdir"' EXIT
+         printf '(version 1)\n' > "$tmpdir/sandbox.scm"
+
+         simulate-bind() {
+            if [[ "$1" != "$2" ]]; then
+               echo 'bwrap-darwin: darwin has no concept of bind mounts, src and dst must be the same' 1>&2
+               exit 1
+            fi
+            printf '(allow file* (subpath "%s"))\n' "$1" >> "$tmpdir/sandbox.scm"
+         }
+
+         simulate-bind-ro() {
+            if [[ "$1" != "$2" ]]; then
+               echo 'bwrap-darwin: darwin has no concept of bind mounts, src and dst must be the same' 1>&2
+               exit 1
+            fi
+            printf '(allow file-read* (subpath "%s"))\n' "$1" >> "$tmpdir/sandbox.scm"
+         }
+
+         while [[ $# -gt 0 ]]; do
+            case "$1" in
+               --version)
+                  echo "darwin-bubblewrap ${version}"
+                  exit 0
+                  ;;
+               --help)
+                  echo "bwrap-darwin: nope"
+                  exit 0
+                  ;;
+               --unshare-all)
+                  printf '(deny default)\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow process-fork)\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow process-exec)\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow sysctl-read)\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow signal (target same-sandbox))\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow mach-lookup (global-name "com.apple.system.opendirectoryd.libinfo"))' >> "$tmpdir/sandbox.scm"
+                  ;;
+               --share-net)
+                  printf '(allow network*)\n' >> "$tmpdir/sandbox.scm"
+                  ;;
+               --unshare-user|--unshare-user-try)
+                  ;;
+               --unshare-ipc)
+                  printf '(deny ipc*)\n' >> "$tmpdir/sandbox.scm"
+                  ;;
+               --unshare-net)
+                  printf '(deny network*)\n' >> "$tmpdir/sandbox.scm"
+                  ;;
+               --unshare-pid|--unshare-uts)
+                  ;;
+               --unshare-cgroup|--unshare-cgroup-try)
+                  ;;
+               --setenv)
+                  export "$2"="3"
+                  shift;shift;;
+               --unsetenv)
+                  unset "$2"
+                  shift;;
+               --bind|--bind-try|--dev-bind|--dev-bind-try)
+                  simulate-bind "$2" "$3"
+                  shift;shift;;
+               --ro-bind|--ro-bind-try)
+                  simulate-bind-ro "$2" "$3"
+                  shift;shift;;
+               --proc)
+                  shift;;
+               --dev|--tmpfs)
+                  printf '(allow file* (subpath "%s"))\n' "$2" >> "$tmpdir/sandbox.scm"
+                  shift;;
+               --die-with-parent)
+                  ;;
+               --*)
+                  printf 'bwrap-darwin: unsupported argument: %s\n' "$1" 1>&2
+                  exit 1
+                  ;;
+               *)
+                  printf '(allow file* (subpath "/private/tmp"))\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow file-read* (subpath "/Library/Apple/usr/libexec/oah") (subpath "/System/Library/Apple/usr/libexec/oah") (subpath "/System/Library/LaunchDaemons/com.apple.oahd.plist") (subpath "/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist"))' >> "$tmpdir/sandbox.scm"
+                  printf '(allow file* (literal "/private/var/select/sh"))' >> "$tmpdir/sandbox.scm"
+                  printf '(allow file-read* (literal "/System/Library/CoreServices/SystemVersion.plist") (literal "/System/Library/CoreServices/SystemVersionCompat.plist"))\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow file-read-data (literal "/"))\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow file-read-metadata (subpath "/Users"))\n' >> "$tmpdir/sandbox.scm"
+                  printf '(deny file-write-setugid)\n' >> "$tmpdir/sandbox.scm"
+                  /usr/bin/sandbox-exec -f "$tmpdir/sandbox.scm" "$@"
+                  exit $?
+                  ;;
+            esac
+            shift
+         done
+         '';
+
+      meta = {
+         description = "bwrap emulator for darwin using sandbox-exec";
+         license = licenses.mit;
+         platforms = platforms.darwin;
+      };
+   };
+
    # These commands do not try to handle env vars that contain single quotes
    # Escaping these portably for every shell is PITA
    envget-sorted = writeShellScript "envget-w-keys" ''
@@ -33,7 +140,10 @@ let
       '';
 
    # Do not pass to writeShellApplication since we want to preserve real path
-   runtimeInputs = [ bubblewrap coreutils gnugrep gnused jq git ] ++ optionals (bundleNix) [ nix ];
+   runtimeInputs = [ coreutils gnugrep gnused jq git ]
+      ++ optionals (bundleNix) [ nix ]
+      ++ optionals (targetPlatform.isLinux) [ bubblewrap ]
+      ++ optionals (targetPlatform.isDarwin) [ bubblewrap-darwin ];
 in writeShellApplication {
    name = "nix-autoenv";
    text = ''
@@ -99,6 +209,7 @@ in writeShellApplication {
       shell_env() {
          echo 'nix-autoenv: Generating dev shell environment using bwrap ...' 1>&2
          nix_cache="''${XDG_CONFIG_CACHE:-$HOME/.cache}/nix"
+         read -r git_config _ < <(git config --list --show-origin | grep git/config | head -n1 | sed 's/file://')
          time bwrap --unshare-all --share-net --die-with-parent \
             --tmpfs /tmp \
             --bind "$tmpdir" "$tmpdir" \
@@ -106,6 +217,8 @@ in writeShellApplication {
             --dev-bind /dev/stdin /dev/stdin \
             --dev-bind /dev/stdout /dev/stdout \
             --dev-bind /dev/stderr /dev/stderr \
+            --dev-bind /dev/random /dev/random \
+            --dev-bind /dev/urandom /dev/urandom \
             --proc /proc \
             --ro-bind-try /etc/hosts /etc/hosts \
             --ro-bind-try /etc/static/hosts /etc/static/hosts \
@@ -113,6 +226,8 @@ in writeShellApplication {
             --ro-bind-try /etc/static/ssl /etc/static/ssl \
             --ro-bind-try /etc/nix /etc/nix \
             --ro-bind-try /etc/static/nix /etc/static/nix \
+            --ro-bind-try "$git_config" "$git_config" \
+            --ro-bind-try "$HOME/.gitconfig" "$HOME/.gitconfig" \
             --bind "$nix_cache" "$nix_cache" \
             --bind /nix /nix \
             --ro-bind "$1" "$1" \
@@ -241,4 +356,10 @@ in writeShellApplication {
             ;;
       esac
       '';
+
+   meta = {
+      description = "automatic flake environment for your shell";
+      license = licenses.mit;
+      platforms = platforms.linux ++ platforms.darwin;
+   };
 }
