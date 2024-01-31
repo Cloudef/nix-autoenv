@@ -136,16 +136,13 @@ in writeShellApplication {
       }
 
       flake_detect() {
-         if "$NIX" flake info --json 1>"$tmpdir/info" 2>/dev/null && \
-            "$NIX" flake show --json 2>/dev/null | jq -e --arg system "${targetPlatform.system}" -r '.devShells."\($system)" | keys | .[]' 2>/dev/null 1>"$tmpdir/devshells"; then
+         if "$NIX" flake info --json 1>"$tmpdir/info" 2>/dev/null; then
             url=$(jq -r '.original.url' "$tmpdir/info")
             if [[ "$url" != "''${__nix_autoenv_flake_url:-}" ]]; then
                if [[ ''${NIX_AUTOENV_AUTO:-0} == 1 ]]; then
                   flake_env "$1" "$2" .
                else
                   printf '__nix_autoenv_flake_url=%s\0' "$url" | $2 0
-                  echo 'nix-autoenv: Nix flake with following dev shells detected:' 1>&2
-                  xargs printf 'nix-autoenv: > %s\n' < "$tmpdir/devshells" 1>&2
                   # shellcheck disable=SC2016
                   echo 'nix-autoenv: Use `nix-autoenv switch [dev shell]` to switch to an dev environment' 1>&2
                fi
