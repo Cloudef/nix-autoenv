@@ -118,7 +118,7 @@ in writeShellApplication {
 
       flake_env() {
          if "$NIX" flake info --json 1>"$tmpdir/info" 2>/dev/null; then
-            IFS=$'\n' read -rd "" rev url < <(jq -r 'if .dirtyRevision != null then .dirtyRevision else .revision end, .original.url' "$tmpdir/info") || true
+            IFS=$'\n' read -rd "" rev url < <(jq -r '.url, .original.url' "$tmpdir/info") || true
             test "$rev" != "null" && test "$rev" != ""
             path="''${url/file:\/\//}"
             if shell_env "$path" "$3"; then
@@ -133,7 +133,7 @@ in writeShellApplication {
       flake_detect() {
          if "$NIX" flake info --json 1>"$tmpdir/info" 2>/dev/null && \
             "$NIX" flake show --json 2>/dev/null | jq -e --arg system "${targetPlatform.system}" -r '.devShells."\($system)" | keys | .[]' 1>"$tmpdir/devshells"; then
-            rev="$(jq -r 'if .dirtyRevision != null then .dirtyRevision else .revision end' "$tmpdir/info")"
+            rev="$(jq -r '.url' "$tmpdir/info")"
             if [[ "$rev" != "''${__nix_autoenv_flake_rev:-}" ]]; then
                printf '__nix_autoenv_flake_rev=%s\0' "$rev" | $2
                if [[ ''${NIX_AUTOENV_AUTO:-0} == 1 ]]; then
