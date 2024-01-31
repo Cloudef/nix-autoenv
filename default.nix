@@ -144,7 +144,7 @@ in writeShellApplication {
                   echo 'nix-autoenv: Use `nix-autoenv switch [dev shell]` to switch to an dev environment' 1>&2
                fi
             else
-               git_state="$(nix hash file <(git status --porcelain=v2 2>/dev/null))"
+               git_state="$(nix hash file <(git status --porcelain=v2 2>/dev/null | grep -Po '.*(?=\s+[^\s]+$)' 2>/dev/null))"
                if [[ "$git_state" != "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=" ]]; then
                   if [[ "$git_state" != "''${__nix_autoenv_flake_git_state:-}" ]]; then
                      if [[ "''${__nix_autoenv_flake_shell:-}" ]]; then
