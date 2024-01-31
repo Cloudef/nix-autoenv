@@ -19,9 +19,9 @@ nix-autoenv zsh-setup
 nix-autoenv bash-setup
 ```
 
-#### Manual use
+#### Fully automatic use
 
-You can use nix-autoenv manually as well by creating shell function that sources the output of `nix-autoenv <your-shell-here>`
+To make nix-autoenv always automatically switch to default devShell, set the `NIX_AUTOENV_AUTO` env variable to `1`.
 
 ### How does it work?
 
