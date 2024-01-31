@@ -21,17 +21,24 @@ let
    # These commands do not try to handle env vars that contain single quotes
    # Escaping these portably for every shell is PITA
    envget-sorted = writeShellScript "envget-w-keys" ''
+      PATH="$__nix_autoenv_real_path" \
       ${coreutils}/bin/env -u PWD -u SHLVL -u _ -u TEMP -u TEMPDIR -u TMPDIR -u TMP -0 |\
          ${gnugrep}/bin/grep -zv __nix_autoenv_ | ${gnugrep}/bin/grep -zv "'" | ${coreutils}/bin/sort -zu > "$1"
       '';
    envget = writeShellScript "envget" ''
-      ${coreutils}/bin/env -u PWD -u SHLVL -u _ -u TEMP -u TEMPDIR -u TMPDIR -u TMP -u __nix_autoenv_prev_pwd -0 |\
+      PATH="$__nix_autoenv_real_path" \
+      ${coreutils}/bin/env -u PWD -u SHLVL -u _ -u TEMP -u TEMPDIR -u TMPDIR -u TMP \
+         -u __nix_autoenv_real_path -u __nix_autoenv_prev_pwd -0 |\
          ${gnugrep}/bin/grep -zv "'"
       '';
+
+   # Do not pass to writeShellApplication since we want to preserve real path
+   runtimeInputs = [ bubblewrap coreutils gnugrep gnused jq git ] ++ optionals (bundleNix) [ nix ];
 in writeShellApplication {
    name = "nix-autoenv";
-   runtimeInputs = [ bubblewrap coreutils gnugrep gnused jq git ] ++ optionals (bundleNix) [ nix ];
    text = ''
+      export __nix_autoenv_real_path="$PATH"
+      export PATH="${makeBinPath runtimeInputs}:$PATH"
       ${if bundleNix then "NIX=nix" else ''NIX="$(readlink /var/run/current-system/sw/bin/nix)"''}
       tmpdir="$(mktemp -d)"
       trap 'rm -rf "$tmpdir"' EXIT
