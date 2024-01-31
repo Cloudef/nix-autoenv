@@ -184,7 +184,7 @@ in writeShellApplication {
             flake_detect unset_fish export_fish
             ;;
          fish-export)
-            flake_env unset_fish export_fish ".#''${2-}"
+            flake_env unset_fish export_fish ".#''${2:-}"
             ;;
          bash-setup)
             printf 'source <(${placeholder "out"}/bin/nix-autoenv bash-source)\n'
