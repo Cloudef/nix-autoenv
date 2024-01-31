@@ -22,15 +22,11 @@ let
    # Escaping these portably for every shell is PITA
    envget-sorted = writeShellScript "envget-w-keys" ''
       ${coreutils}/bin/env -u PWD -u SHLVL -u _ -u TEMP -u TEMPDIR -u TMPDIR -u TMP -0 |\
-      while IFS='=' read -d $'\0' -r k v; do
-         printf '%s=%s\0' "$k" "$v"
-      done | ${gnugrep}/bin/grep -zv __nix_autoenv_ | ${gnugrep}/bin/grep -zv "'" | ${coreutils}/bin/sort -zu > "$1"
+         ${gnugrep}/bin/grep -zv __nix_autoenv_ | ${gnugrep}/bin/grep -zv "'" | ${coreutils}/bin/sort -zu > "$1"
       '';
    envget = writeShellScript "envget" ''
       ${coreutils}/bin/env -u PWD -u SHLVL -u _ -u TEMP -u TEMPDIR -u TMPDIR -u TMP -u __nix_autoenv_prev_pwd -0 |\
-      while IFS='=' read -d $'\0' -r k v; do
-         printf '%s=%s\0' "$k" "$v"
-      done | ${gnugrep}/bin/grep -zv "'"
+         ${gnugrep}/bin/grep -zv "'"
       '';
 in writeShellApplication {
    name = "nix-autoenv";
@@ -51,7 +47,10 @@ in writeShellApplication {
       }
 
       export_sh() {
-         while IFS='=' read -d $'\0' -r k v; do
+         # do not use IFS='=' because it gobbles other = characters
+         while IFS="" read -d $'\0' -r var; do
+            k="''${var%%=*}"
+            v="''${var#*=}"
             if [[ "''${1:-}" != 0 ]] && [[ "''${!k:-}" != "$v" ]]; then
                printf "export %s__nix_autoenv_saved_='%s'\n" "$k" "''${!k:-}"
             fi
@@ -70,7 +69,10 @@ in writeShellApplication {
       }
 
       export_fish() {
-         while IFS='=' read -d $'\0' -r k v; do
+         # do not use IFS='=' because it gobbles other = characters
+         while IFS="" read -d $'\0' -r var; do
+            k="''${var%%=*}"
+            v="''${var#*=}"
             if [[ "''${1:-}" != 0 ]] && [[ "''${!k:-}" != "$v" ]]; then
                printf "set -gx %s__nix_autoenv_saved_ '%s'\n" "$k" "''${!k:-}"
             fi
@@ -125,6 +127,10 @@ in writeShellApplication {
                ${envget-sorted} "$tmpdir/orig"
                comm --check-order -z23 "$tmpdir/env" "$tmpdir/orig" | $2
                printf '__nix_autoenv_flake_url=%s\0__nix_autoenv_flake_shell=%s\0' "$url" "$3" | $2 0
+               if git status --porcelain=v2 2>/dev/null | (grep -Po '.*(?=\s+[^\s]+$)' 2>/dev/null || true) > "$tmpdir/git-state"; then
+                  git_state="$(nix hash file "$tmpdir/git-state")"
+                  printf '__nix_autoenv_flake_git_state=%s\0' "$git_state" | $2 0
+               fi
             fi
          fi
       }
@@ -134,22 +140,21 @@ in writeShellApplication {
             "$NIX" flake show --json 2>/dev/null | jq -e --arg system "${targetPlatform.system}" -r '.devShells."\($system)" | keys | .[]' 2>/dev/null 1>"$tmpdir/devshells"; then
             url=$(jq -r '.original.url' "$tmpdir/info")
             if [[ "$url" != "''${__nix_autoenv_flake_url:-}" ]]; then
-               printf '__nix_autoenv_flake_url=%s\0' "$url" | $2 0
                if [[ ''${NIX_AUTOENV_AUTO:-0} == 1 ]]; then
                   flake_env "$1" "$2" .
                else
+                  printf '__nix_autoenv_flake_url=%s\0' "$url" | $2 0
                   echo 'nix-autoenv: Nix flake with following dev shells detected:' 1>&2
                   xargs printf 'nix-autoenv: > %s\n' < "$tmpdir/devshells" 1>&2
                   # shellcheck disable=SC2016
                   echo 'nix-autoenv: Use `nix-autoenv switch [dev shell]` to switch to an dev environment' 1>&2
                fi
             else
-               git_state="$(nix hash file <(git status --porcelain=v2 2>/dev/null | grep -Po '.*(?=\s+[^\s]+$)' 2>/dev/null))"
-               if [[ "$git_state" != "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=" ]]; then
-                  if [[ "$git_state" != "''${__nix_autoenv_flake_git_state:-}" ]]; then
-                     if [[ "''${__nix_autoenv_flake_shell:-}" ]]; then
-                        flake_env "$1" "$2" "$__nix_autoenv_flake_shell"
-                     fi
+               if git status --porcelain=v2 2>/dev/null | (grep -Po '.*(?=\s+[^\s]+$)' 2>/dev/null || true) > "$tmpdir/git-state"; then
+                  git_state="$(nix hash file "$tmpdir/git-state")"
+                  if [[ "$git_state" != "''${__nix_autoenv_flake_git_state:-}" ]] && [[ "''${__nix_autoenv_flake_shell:-}" ]]; then
+                     printf 'nix-autoenv: Changes detected %s != %s ...\n' "$git_state" "''${__nix_autoenv_flake_git_state:-none}" 1>&2
+                     flake_env "$1" "$2" "$__nix_autoenv_flake_shell"
                   fi
                   printf '__nix_autoenv_flake_git_state=%s\0' "$git_state" | $2 0
                fi
