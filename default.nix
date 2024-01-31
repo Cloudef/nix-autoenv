@@ -124,7 +124,7 @@ in writeShellApplication {
                restore_env "$1" "$2"
                ${envget-sorted} "$tmpdir/orig"
                comm --check-order -z23 "$tmpdir/env" "$tmpdir/orig" | $2
-               printf '__nix_autoenv_flake_rev=%s\0__nix_autoenv_flake_shell=%s\0' "$rev" "$3" | $2
+               printf '__nix_autoenv_flake_rev=%s\0__nix_autoenv_flake_shell=%s\0' "$rev" "$3" | $2 0
             fi
          fi
       }
@@ -134,7 +134,7 @@ in writeShellApplication {
             "$NIX" flake show --json 2>/dev/null | jq -e --arg system "${targetPlatform.system}" -r '.devShells."\($system)" | keys | .[]' 1>"$tmpdir/devshells"; then
             rev=$(jq -r '.url, .lastModified' "$tmpdir/info")
             if [[ "$rev" != "''${__nix_autoenv_flake_rev:-}" ]]; then
-               printf '__nix_autoenv_flake_rev=%s\0' "$rev" | $2
+               printf '__nix_autoenv_flake_rev=%s\0' "$rev" | $2 0
                if [[ ''${NIX_AUTOENV_AUTO:-0} == 1 ]]; then
                   flake_env "$1" "$2" .
                else
@@ -151,7 +151,7 @@ in writeShellApplication {
                         flake_env "$1" "$2" "$__nix_autoenv_flake_shell"
                      fi
                   fi
-                  printf '__nix_autoenv_flake_git_state=%s\0' "$git_state" | $2
+                  printf '__nix_autoenv_flake_git_state=%s\0' "$git_state" | $2 0
                fi
             fi
          elif is_in_flake; then
