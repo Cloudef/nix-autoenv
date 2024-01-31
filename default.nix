@@ -24,10 +24,10 @@ let
       ${coreutils}/bin/env -u PWD -u SHLVL -u _ -u TEMP -u TEMPDIR -u TMPDIR -u TMP -0 |\
       while IFS='=' read -d $'\0' -r k v; do
          printf '%s=%s\0' "$k" "$v"
-      done | ${gnugrep}/bin/grep -zv __nix_autoenv_saved_ | ${gnugrep}/bin/grep -zv "'" | ${coreutils}/bin/sort -zu > "$1"
+      done | ${gnugrep}/bin/grep -zv __nix_autoenv_ | ${gnugrep}/bin/grep -zv "'" | ${coreutils}/bin/sort -zu > "$1"
       '';
    envget = writeShellScript "envget" ''
-      ${coreutils}/bin/env -u PWD -u SHLVL -u _ -u TEMP -u TEMPDIR -u TMPDIR -u TMP -0 |\
+      ${coreutils}/bin/env -u PWD -u SHLVL -u _ -u TEMP -u TEMPDIR -u TMPDIR -u TMP -u __nix_autoenv_prev_pwd -0 |\
       while IFS='=' read -d $'\0' -r k v; do
          printf '%s=%s\0' "$k" "$v"
       done | ${gnugrep}/bin/grep -zv "'"
@@ -83,8 +83,8 @@ in writeShellApplication {
       }
 
       restore_env() {
-         ${envget} | grep -z __nix_autoenv_saved_ | $1 || true
          ${envget} | grep -z __nix_autoenv_saved_ | sed -z 's/__nix_autoenv_saved_//' | $2 0 || true
+         ${envget} | grep -z __nix_autoenv_ | $1 || true
       }
 
       shell_env() {
@@ -119,13 +119,12 @@ in writeShellApplication {
       flake_env() {
          if "$NIX" flake info --json 1>"$tmpdir/info" 2>/dev/null; then
             IFS=$'\n' read -rd "" rev url < <(jq -r '.url, .original.url' "$tmpdir/info") || true
-            test "$rev" != "null" && test "$rev" != ""
             path="''${url/file:\/\//}"
             if shell_env "$path" "$3"; then
                restore_env "$1" "$2"
                ${envget-sorted} "$tmpdir/orig"
                comm --check-order -z23 "$tmpdir/env" "$tmpdir/orig" | $2
-               printf '__nix_autoenv_flake_rev=%s\0' "$rev" | $2
+               printf '__nix_autoenv_flake_rev=%s\0__nix_autoenv_flake_shell=%s\0' "$rev" "$3" | $2
             fi
          fi
       }
@@ -133,7 +132,7 @@ in writeShellApplication {
       flake_detect() {
          if "$NIX" flake info --json 1>"$tmpdir/info" 2>/dev/null && \
             "$NIX" flake show --json 2>/dev/null | jq -e --arg system "${targetPlatform.system}" -r '.devShells."\($system)" | keys | .[]' 1>"$tmpdir/devshells"; then
-            rev="$(jq -r '.url' "$tmpdir/info")"
+            rev=$(jq -r '.url, .lastModified' "$tmpdir/info")
             if [[ "$rev" != "''${__nix_autoenv_flake_rev:-}" ]]; then
                printf '__nix_autoenv_flake_rev=%s\0' "$rev" | $2
                if [[ ''${NIX_AUTOENV_AUTO:-0} == 1 ]]; then
@@ -143,6 +142,16 @@ in writeShellApplication {
                   xargs printf 'nix-autoenv: > %s\n' < "$tmpdir/devshells" 1>&2
                   # shellcheck disable=SC2016
                   echo 'nix-autoenv: Use `nix-autoenv switch [dev shell]` to switch to an dev environment' 1>&2
+               fi
+            else
+               git_state="$(nix hash file <(git status --porcelain=v2 2>/dev/null))"
+               if [[ "$git_state" != "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=" ]]; then
+                  if [[ "$git_state" != "''${__nix_autoenv_flake_git_state:-}" ]]; then
+                     if [[ "''${__nix_autoenv_flake_shell:-}" ]]; then
+                        flake_env "$1" "$2" "$__nix_autoenv_flake_shell"
+                     fi
+                  fi
+                  printf '__nix_autoenv_flake_git_state=%s\0' "$git_state" | $2
                fi
             fi
          elif is_in_flake; then
