@@ -145,7 +145,7 @@ let
 in writeShellApplication {
    name = "nix-autoenv";
    text = ''
-      export __nix_autoenv_real_path="$PATH"
+      export __nix_autoenv_real_path="''${PATH__nix_autoenv_saved_:-$PATH}"
       export PATH="${makeBinPath runtimeInputs}:$PATH"
       ${if bundleNix then "NIX=nix" else ''NIX="$(readlink /var/run/current-system/sw/bin/nix)"''}
       tmpdir="$(mktemp -d)"
