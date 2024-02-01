@@ -157,7 +157,8 @@ in writeShellApplication {
 
       unset_sh() {
          while IFS='=' read -d $'\0' -r k _; do
-            printf 'unset %s\n' "$k"
+            printf "unset '%s'\n" "$k"
+            unset "$k"
          done
       }
 
@@ -168,19 +169,22 @@ in writeShellApplication {
             v="''${var#*=}"
             saved="''${k}__nix_autoenv_saved_"
             if [[ "''${1:-}" != 0 ]] && [[ ! "''${!saved:-}" ]] && [[ "''${!k:-}" != "$v" ]]; then
-               printf "export %s__nix_autoenv_saved_='%s'\n" "$k" "''${!k:-}"
+               printf "export '%s'='%s'\n" "$saved" "''${!k:-}"
             fi
             if [[ "$v" != "" ]]; then
-               printf "export %s='%s'\n" "$k" "$v"
+               printf "export '%s'='%s'\n" "$k" "$v"
+               export "$k"="$v"
             else
-               printf 'unset %s\n' "$k"
+               printf "unset '%s'\n" "$k"
+               unset "$k"
             fi
          done
       }
 
       unset_fish() {
          while IFS='=' read -d $'\0' -r k _; do
-            printf 'set -e %s\n' "$k"
+            printf "set -e '%s'\n" "$k"
+            unset "$k"
          done
       }
 
@@ -191,19 +195,21 @@ in writeShellApplication {
             v="''${var#*=}"
             saved="''${k}__nix_autoenv_saved_"
             if [[ "''${1:-}" != 0 ]] && [[ ! "''${!saved:-}" ]] && [[ "''${!k:-}" != "$v" ]]; then
-               printf "set -gx %s__nix_autoenv_saved_ '%s'\n" "$k" "''${!k:-}"
+               printf "set -gx '%s' '%s'\n" "$saved" "''${!k:-}"
             fi
             if [[ "$v" != "" ]]; then
-               printf "set -gx %s '%s'\n" "$k" "$v"
+               printf "set -gx '%s' '%s'\n" "$k" "$v"
+               export "$k"="$v"
             else
-               printf 'set -e %s\n' "$k"
+               printf "set -e '%s'\n" "$k"
+               unset "$k"
             fi
          done
       }
 
       restore_env() {
-         ${envget} | grep -z __nix_autoenv_saved_ | sed -z 's/__nix_autoenv_saved_//' | $2 0 || true
-         ${envget} | grep -z __nix_autoenv_ | $1 || true
+         $2 0 < <(${envget} | grep -z __nix_autoenv_saved_ | sed -z 's/__nix_autoenv_saved_//') || true
+         $1 < <(${envget} | grep -z __nix_autoenv_) || true
       }
 
       shell_env() {
@@ -248,11 +254,11 @@ in writeShellApplication {
             if shell_env "$path" "$3"; then
                restore_env "$1" "$2"
                ${envget-sorted} "$tmpdir/orig"
-               comm --check-order -z23 "$tmpdir/env" "$tmpdir/orig" | $2
-               printf '__nix_autoenv_flake_url=%s\0__nix_autoenv_flake_shell=%s\0' "$url" "$3" | $2 0
+               $2 < <(comm --check-order -z23 "$tmpdir/env" "$tmpdir/orig")
+               $2 0 < <(printf '__nix_autoenv_flake_url=%s\0__nix_autoenv_flake_shell=%s\0' "$url" "$3")
                if git status --porcelain=v2 2>/dev/null | (grep -Po '.*(?=\s+[^\s]+$)' 2>/dev/null || true) > "$tmpdir/git-state"; then
                   git_state="$("$NIX" hash file "$tmpdir/git-state")"
-                  printf '__nix_autoenv_flake_git_state=%s\0' "$git_state" | $2 0
+                  $2 0 < <(printf '__nix_autoenv_flake_git_state=%s\0' "$git_state")
                fi
             fi
          fi
@@ -265,7 +271,7 @@ in writeShellApplication {
                if [[ ''${NIX_AUTOENV_AUTO:-0} == 1 ]]; then
                   flake_env "$1" "$2" .
                else
-                  printf '__nix_autoenv_flake_url=%s\0' "$url" | $2 0
+                  $2 0 < <(printf '__nix_autoenv_flake_url=%s\0' "$url")
                   # shellcheck disable=SC2016
                   echo 'nix-autoenv: Use `nix-autoenv switch [dev shell]` to switch to an dev environment' 1>&2
                fi
@@ -276,7 +282,7 @@ in writeShellApplication {
                      printf 'nix-autoenv: Changes detected %s != %s ...\n' "$git_state" "''${__nix_autoenv_flake_git_state:-none}" 1>&2
                      flake_env "$1" "$2" "$__nix_autoenv_flake_shell"
                   fi
-                  printf '__nix_autoenv_flake_git_state=%s\0' "$git_state" | $2 0
+                  $2 0 < <(printf '__nix_autoenv_flake_git_state=%s\0' "$git_state")
                fi
             fi
          elif is_in_flake; then
