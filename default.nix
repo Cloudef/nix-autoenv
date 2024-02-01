@@ -227,6 +227,7 @@ in writeShellApplication {
             --dev-bind /dev/random /dev/random \
             --dev-bind /dev/urandom /dev/urandom \
             --proc /proc \
+            --ro-bind-try /etc/resolv.conf /etc/resolv.conf \
             --ro-bind-try /etc/hosts /etc/hosts \
             --ro-bind-try /etc/static/hosts /etc/static/hosts \
             --ro-bind-try /etc/ssl /etc/ssl \
