@@ -9,7 +9,8 @@ nix-direnv alternative that does not need a .direnv metafile
 > - add tests
 > - nix-autoenv auto save (to make certain paths automatic)
 
-![animation](./animation.svg)
+![animation-1](./animation-1.svg)
+![animation-2](./animation-2.svg)
 
 ### How to setup?
 
