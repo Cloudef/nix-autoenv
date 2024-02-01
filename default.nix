@@ -166,7 +166,8 @@ in writeShellApplication {
          while IFS="" read -d $'\0' -r var; do
             k="''${var%%=*}"
             v="''${var#*=}"
-            if [[ "''${1:-}" != 0 ]] && [[ "''${!k:-}" != "$v" ]]; then
+            saved="''${k}__nix_autoenv_saved_"
+            if [[ "''${1:-}" != 0 ]] && [[ ! "''${!saved:-}" ]] && [[ "''${!k:-}" != "$v" ]]; then
                printf "export %s__nix_autoenv_saved_='%s'\n" "$k" "''${!k:-}"
             fi
             if [[ "$v" != "" ]]; then
@@ -188,7 +189,8 @@ in writeShellApplication {
          while IFS="" read -d $'\0' -r var; do
             k="''${var%%=*}"
             v="''${var#*=}"
-            if [[ "''${1:-}" != 0 ]] && [[ "''${!k:-}" != "$v" ]]; then
+            saved="''${k}__nix_autoenv_saved_"
+            if [[ "''${1:-}" != 0 ]] && [[ ! "''${!saved:-}" ]] && [[ "''${!k:-}" != "$v" ]]; then
                printf "set -gx %s__nix_autoenv_saved_ '%s'\n" "$k" "''${!k:-}"
             fi
             if [[ "$v" != "" ]]; then
