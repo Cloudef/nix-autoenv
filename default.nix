@@ -216,6 +216,11 @@ in writeShellApplication {
          echo 'nix-autoenv: Generating dev shell environment using bwrap ...' 1>&2
          nix_cache="''${XDG_CONFIG_CACHE:-$HOME/.cache}/nix"
          read -r git_config _ < <(git config --list --show-origin | grep git/config | head -n1 | sed 's/file://')
+         root="$1"
+         submod="$(cd "$root" && git rev-parse --show-superproject-working-tree)"
+         if [[ "$submod" ]]; then
+            root="$submod"
+         fi
          time bwrap --unshare-all --share-net --die-with-parent \
             --setenv PATH "$__nix_autoenv_real_path:${git}/bin" \
             --tmpfs /tmp \
@@ -238,7 +243,7 @@ in writeShellApplication {
             --ro-bind-try "$HOME/.gitconfig" "$HOME/.gitconfig" \
             --bind "$nix_cache" "$nix_cache" \
             --bind /nix /nix \
-            --ro-bind "$1" "$1" \
+            --ro-bind "$root" "$root" \
             "$NIX" \
                --extra-experimental-features nix-command \
                --extra-experimental-features flakes \
