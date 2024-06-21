@@ -103,14 +103,18 @@ let
                   exit 1
                   ;;
                *)
-                  printf '(allow file* (subpath "/private/tmp"))\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow file-read* (subpath "/usr/lib") (subpath "/usr/bin") (subpath "/bin"))\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow file-read* (subpath "/Applications/Xcode.app"))\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow file-read* (literal "/Library/Preferences/com.apple.dt.Xcode.plist"))\n' >> "$tmpdir/sandbox.scm"
                   printf '(allow file-read* (subpath "/Library/Apple/usr/libexec/oah") (subpath "/System/Library/Apple/usr/libexec/oah") (subpath "/System/Library/LaunchDaemons/com.apple.oahd.plist") (subpath "/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist"))' >> "$tmpdir/sandbox.scm"
-                  printf '(allow file* (literal "/private/var/select/sh"))' >> "$tmpdir/sandbox.scm"
                   printf '(allow file-read* (literal "/System/Library/CoreServices/SystemVersion.plist") (literal "/System/Library/CoreServices/SystemVersionCompat.plist"))\n' >> "$tmpdir/sandbox.scm"
                   printf '(allow file-read-data (literal "/"))\n' >> "$tmpdir/sandbox.scm"
                   printf '(allow file-read-metadata (subpath "/Users"))\n' >> "$tmpdir/sandbox.scm"
                   printf '(deny file-write-setugid)\n' >> "$tmpdir/sandbox.scm"
-                  /usr/bin/sandbox-exec -f "$tmpdir/sandbox.scm" "$@"
+                  printf '(allow file* (subpath "/private/tmp"))\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow file* (subpath "/private/var") (subpath "/var"))\n' >> "$tmpdir/sandbox.scm"
+                  printf '(allow file-read* (subpath "/private/etc") (subpath "/etc"))\n' >> "$tmpdir/sandbox.scm"
+                  TMPDIR=/private/tmp /usr/bin/sandbox-exec -f "$tmpdir/sandbox.scm" "$@"
                   exit $?
                   ;;
             esac
